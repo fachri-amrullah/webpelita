@@ -30,7 +30,6 @@ router.post('/', async (req, res, next) => {
     const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000);
     const scheduleLabel = (description: string | null | undefined) =>
       (description ?? '')
-        .replace(/PELITA_DEMO_[A-Z_]+/gi, '')
         .replace(/[^\p{L}\p{N}]+/gu, ' ')
         .trim()
         .toLocaleLowerCase();
@@ -52,8 +51,22 @@ router.post('/', async (req, res, next) => {
 router.delete('/:id', async (req, res, next) => {
   try {
     const id = idSchema.parse(req.params.id);
-    await prisma.jadwalPosyandu.delete({ where: { id } });
-    return success(res, { id }, 'Schedule deleted');
+    const deleted = await prisma.$transaction(async (tx) => {
+      const schedule = await tx.jadwalPosyandu.findUnique({
+        where: { id },
+        select: { id: true },
+      });
+      if (!schedule) return null;
+
+      const [examinations, queues] = await Promise.all([
+        tx.pemeriksaan.deleteMany({ where: { jadwalId: id } }),
+        tx.antrean.deleteMany({ where: { jadwalId: id } }),
+      ]);
+      await tx.jadwalPosyandu.delete({ where: { id } });
+      return { id, deletedExaminations: examinations.count, deletedQueues: queues.count };
+    });
+    if (!deleted) return failure(res, 'Schedule not found', 404);
+    return success(res, deleted, 'Schedule and its queue and examination records deleted');
   } catch (error) { return next(error); }
 });
 export default router;

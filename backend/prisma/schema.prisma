@@ -1,3 +1,4 @@
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -49,7 +50,20 @@ model User {
   role         Role     @default(KADER)
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
+  roles        UserRoleGrant[]
+
   @@map("users")
+}
+
+model UserRoleGrant {
+  userId    String   @map("user_id")
+  role      Role
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, role])
+  @@index([role])
+  @@map("user_roles")
 }
 
 model Peserta {
@@ -65,6 +79,7 @@ model Peserta {
   updatedAt    DateTime         @updatedAt @map("updated_at")
   antrean      Antrean[]
   pemeriksaan  Pemeriksaan[]
+
   @@index([nama])
   @@index([kategori])
   @@map("peserta")
@@ -80,20 +95,22 @@ model JadwalPosyandu {
   updatedAt   DateTime     @updatedAt @map("updated_at")
   antrean     Antrean[]
   pemeriksaan Pemeriksaan[]
+
   @@index([tanggal, status])
   @@map("jadwal_posyandu")
 }
 
 model Antrean {
-  id        String        @id @default(cuid())
-  noAntrean Int           @map("no_antrean")
-  pesertaId String        @map("peserta_id")
-  jadwalId  String        @map("jadwal_id")
-  status    StatusAntrean @default(MENUNGGU)
-  tanggal   DateTime      @default(now()) @db.DateTime(3)
-  createdAt DateTime      @default(now()) @map("created_at")
-  peserta   Peserta       @relation(fields: [pesertaId], references: [id], onDelete: Restrict)
+  id        String         @id @default(cuid())
+  noAntrean Int            @map("no_antrean")
+  pesertaId String         @map("peserta_id")
+  jadwalId  String         @map("jadwal_id")
+  status    StatusAntrean  @default(MENUNGGU)
+  tanggal   DateTime       @default(now()) @db.DateTime(3)
+  createdAt DateTime       @default(now()) @map("created_at")
+  peserta   Peserta        @relation(fields: [pesertaId], references: [id], onDelete: Restrict)
   jadwal    JadwalPosyandu @relation(fields: [jadwalId], references: [id], onDelete: Restrict)
+
   @@unique([jadwalId, noAntrean])
   @@unique([jadwalId, pesertaId])
   @@index([jadwalId, status, noAntrean])
@@ -114,6 +131,7 @@ model Pemeriksaan {
   updatedAt          DateTime          @updatedAt @map("updated_at")
   peserta            Peserta           @relation(fields: [pesertaId], references: [id], onDelete: Restrict)
   jadwal             JadwalPosyandu    @relation(fields: [jadwalId], references: [id], onDelete: Restrict)
+
   @@unique([pesertaId, jadwalId])
   @@index([tanggalPemeriksaan, statusPemeriksaan])
   @@map("pemeriksaan")

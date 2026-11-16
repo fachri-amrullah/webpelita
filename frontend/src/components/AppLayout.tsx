@@ -14,23 +14,30 @@ export default function AppLayout({
   const pathname = usePathname();
   const router = useRouter();
   const isLoginPage = pathname === '/login';
+  const isPublicPage = pathname === '/' || isLoginPage;
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isCheckingSession, setIsCheckingSession] = useState(true);
+  const [user, setUser] = useState<ApiUser | null>(null);
 
   useEffect(() => {
-    if (isLoginPage) {
-      setIsCheckingSession(false);
+    if (isPublicPage) {
       return;
     }
 
     let active = true;
     setIsCheckingSession(true);
     apiRequest<ApiUser>('/auth/me')
-      .then(() => {
-        if (active) setIsAuthenticated(true);
+      .then((response) => {
+        if (!active) return;
+        setUser(response.data);
+        setIsAuthenticated(true);
+        if (pathname === '/super-admin' && response.data.role !== 'ADMIN') {
+          router.replace('/dashboard');
+        }
       })
       .catch(() => {
         if (active) {
+          setUser(null);
           setIsAuthenticated(false);
           router.replace('/login?reason=session');
         }
@@ -42,14 +49,13 @@ export default function AppLayout({
     return () => {
       active = false;
     };
-  }, [isLoginPage, pathname, router]);
+  }, [isPublicPage, pathname, router]);
 
-  // Jika di halaman login, tampilkan hanya konten tanpa sidebar
-  if (isLoginPage) {
+  if (isPublicPage) {
     return <>{children}</>;
   }
 
-  if (isCheckingSession || !isAuthenticated) {
+  if (isCheckingSession || !isAuthenticated || (pathname === '/super-admin' && user?.role !== 'ADMIN')) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-gray-50 px-5 text-sm font-medium text-gray-500">
         Memeriksa sesi...
@@ -59,9 +65,9 @@ export default function AppLayout({
 
   // Untuk halaman selain login, tampilkan sidebar + konten
   return (
-    <div className="flex min-h-screen flex-col overflow-hidden md:flex-row">
-      <Sidebar />
-      <main className="min-w-0 flex-1 overflow-y-auto bg-gray-50">
+    <div className="flex min-h-screen flex-col md:flex-row">
+      <Sidebar userRole={user?.role} userName={user?.name} userEmail={user?.email} />
+      <main className="min-h-screen min-w-0 flex-1 bg-gray-50">
         {children}
       </main>
     </div>

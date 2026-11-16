@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { CalendarDays, Search } from 'lucide-react';
 import { apiRequest, Category, displayCategory, Examination } from '../../lib/api';
 
@@ -83,6 +84,8 @@ export default function RekapitulasiPage() {
   }, [period, page, search, kategori]);
 
   const trendMaximum = Math.max(...trends.map((item) => item.jumlahPelayanan), 1);
+  const hasTrendData = trends.some((item) => item.jumlahPelayanan > 0);
+  const hasParticipants = (stats?.totalPeserta ?? 0) > 0;
   const trendPoints = useMemo(() => {
     if (!trends.length) return '';
     return trends.map((item, index) => {
@@ -104,6 +107,19 @@ export default function RekapitulasiPage() {
       </header>
 
       {errorMessage && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{errorMessage}</p>}
+
+      {!isLoading && !errorMessage && !hasParticipants && (
+        <section className="rounded-2xl border border-violet-200 bg-violet-50 p-5 md:flex md:items-center md:justify-between md:gap-6">
+          <div>
+            <h2 className="font-semibold text-violet-950">Belum ada data peserta</h2>
+            <p className="mt-1 text-sm text-violet-800">Angka rekap akan terisi setelah data peserta, jadwal, antrean, dan pemeriksaan dicatat.</p>
+          </div>
+          <div className="mt-4 flex shrink-0 flex-wrap gap-2 md:mt-0">
+            <Link href="/data-peserta" className="rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-800">Tambah Peserta</Link>
+            <Link href="/jadwal-posyandu" className="rounded-xl border border-violet-300 bg-white px-4 py-2.5 text-sm font-semibold text-violet-800 hover:bg-violet-100">Buat Jadwal</Link>
+          </div>
+        </section>
+      )}
 
       <label className="inline-flex items-center gap-3 rounded-2xl border border-violet-200 bg-white px-4 py-3 shadow-sm">
         <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-100 text-violet-700"><CalendarDays size={22} /></span>
@@ -144,7 +160,7 @@ export default function RekapitulasiPage() {
             <span className="flex items-center gap-2 rounded-full bg-violet-50 px-3 py-1.5 text-xs font-medium text-violet-700"><span className="h-2.5 w-2.5 rounded-full bg-violet-500" />Pelayanan</span>
           </div>
           <div className="rounded-2xl bg-slate-50 p-4">
-            {trends.length ? (
+            {trends.length && hasTrendData ? (
               <>
                 <div className="relative h-56 overflow-hidden rounded-2xl border border-slate-200 bg-white">
                   <div className="absolute inset-0 grid grid-rows-4">{[0, 1, 2, 3].map((item) => <div key={item} className="border-b border-slate-200" />)}</div>
@@ -161,7 +177,10 @@ export default function RekapitulasiPage() {
                 </div>
                 <p className="mt-2 text-right text-xs text-slate-400">Skala tertinggi {trendMaximum}</p>
               </>
-            ) : <p className="py-16 text-center text-sm text-slate-500">{isLoading ? 'Memuat tren...' : 'Belum ada data pelayanan.'}</p>}
+            ) : <div className="flex min-h-56 flex-col items-center justify-center px-4 text-center">
+              <p className="font-medium text-slate-700">{isLoading ? 'Memuat tren...' : 'Belum ada pemeriksaan selesai dalam 3 bulan terakhir.'}</p>
+              {!isLoading && <p className="mt-2 max-w-sm text-sm text-slate-500">Grafik akan muncul setelah pemeriksaan peserta dicatat dan diselesaikan.</p>}
+            </div>}
           </div>
         </div>
       </section>
@@ -191,7 +210,7 @@ export default function RekapitulasiPage() {
                   <td className="px-4 py-3">{item.jadwal.lokasi}</td>
                 </tr>
               ))}
-              {!history.length && <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-500">{isLoading ? 'Memuat riwayat...' : 'Data pemeriksaan tidak ditemukan.'}</td></tr>}
+              {!history.length && <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-500">{isLoading ? 'Memuat riwayat...' : historyTotal === 0 && !search.trim() && !kategori ? 'Belum ada riwayat pemeriksaan. Catat pemeriksaan setelah peserta terdaftar dan mengikuti antrean.' : 'Data pemeriksaan tidak ditemukan.'}</td></tr>}
             </tbody>
           </table>
         </div>

@@ -1,6 +1,7 @@
 ﻿import { cookies } from 'next/headers';
 import { SignJWT, jwtVerify } from 'jose';
 import { Role } from '@prisma/client';
+import { prisma } from './db';
 
 export const sessionCookieName = 'pelita_session';
 const sessionDurationSeconds = 60 * 60 * 8;
@@ -28,8 +29,13 @@ export async function currentUser() {
   if (!token) return null;
   try {
     const { payload } = await jwtVerify(token, secretKey());
-    if (!payload.sub || typeof payload.email !== 'string' || typeof payload.name !== 'string' || (payload.role !== 'ADMIN' && payload.role !== 'KADER')) return null;
-    return { id: payload.sub, email: payload.email, name: payload.name, role: payload.role as Role };
+    if (!payload.sub || (payload.role !== 'ADMIN' && payload.role !== 'KADER')) return null;
+    const user = await prisma.user.findUnique({
+      where: { id: payload.sub },
+      select: { id: true, email: true, name: true, roles: { select: { role: true } } },
+    });
+    if (!user || !user.roles.some(({ role }) => role === payload.role)) return null;
+    return { id: user.id, email: user.email, name: user.name, role: payload.role as Role };
   } catch (error) {
     if (error instanceof Error && error.message.includes('JWT_SECRET')) throw error;
     return null;

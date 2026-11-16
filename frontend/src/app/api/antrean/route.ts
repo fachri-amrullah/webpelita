@@ -1,4 +1,4 @@
-﻿import { Prisma, StatusAntrean } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { currentUser } from '../../../lib/server/auth';
 import { prisma } from '../../../lib/server/db';
 import { failure, handleApiError, readJson, success } from '../../../lib/server/response';
@@ -38,4 +38,3 @@ export async function POST(request: Request) {
     return handleApiError(error);
   }
 }
-

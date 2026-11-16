@@ -14,7 +14,7 @@ export async function GET(request: Request) {
     const kategori = params.kategori ? kategoriSchema.parse(params.kategori) : undefined;
     const where: Prisma.PesertaWhereInput = {
       ...(kategori ? { kategori: kategori as KategoriPeserta } : {}),
-      ...(query ? { OR: [{ nama: { contains: query, mode: 'insensitive' } }, { nik: { contains: query } }] } : {}),
+      ...(query ? { OR: [{ nama: { contains: query } }, { nik: { contains: query } }] } : {}),
     };
     const [items, total] = await prisma.$transaction([
       prisma.peserta.findMany({ where, orderBy: { createdAt: 'desc' }, skip: (pagination.page - 1) * pagination.limit, take: pagination.limit }),
@@ -33,4 +33,3 @@ export async function POST(request: Request) {
     return success(peserta, 'Participant created', 201);
   } catch (error) { return handleApiError(error); }
 }
-

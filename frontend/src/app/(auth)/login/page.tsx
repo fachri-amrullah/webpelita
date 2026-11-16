@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { apiRequest, ApiUser } from '../../lib/api';
+import { apiRequest, ApiError, ApiUser } from '../../../lib/api';
 import Image from 'next/image';
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState('aninditatiara1706@gmail.com');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [role, setRole] = useState<'KADER' | 'ADMIN'>('KADER');
   const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -16,6 +17,10 @@ export default function LoginPage() {
 
   useEffect(() => {
     setSessionExpired(new URLSearchParams(window.location.search).get('reason') === 'session');
+    const requestedRole = new URLSearchParams(window.location.search).get('role');
+    if (requestedRole === 'KADER' || requestedRole === 'ADMIN') {
+      setRole(requestedRole);
+    }
   }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -23,13 +28,19 @@ export default function LoginPage() {
     setErrorMessage('');
     setIsSubmitting(true);
     try {
-      await apiRequest<{ user: ApiUser }>('/auth/login', {
+      const response = await apiRequest<{ user: ApiUser }>('/auth/login', {
         method: 'POST',
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, role }),
       });
-      router.replace('/dashboard');
+      router.replace(response.data.user.role === 'ADMIN' ? '/super-admin' : '/dashboard');
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Login gagal.');
+      setErrorMessage(
+        error instanceof ApiError && error.status === 401
+          ? role === 'ADMIN'
+            ? 'Login Super Admin gagal. Periksa email dan kata sandi, serta pastikan akun ini sudah diberi akses Super Admin.'
+            : 'Login Kader gagal. Periksa email dan kata sandi, serta pastikan akun ini sudah diberi akses Kader.'
+          : error instanceof Error ? error.message : 'Login gagal. Silakan coba lagi.',
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -56,7 +67,7 @@ export default function LoginPage() {
           </span>
         </div>
 
-        <h1 className="text-xl font-bold text-black mb-6">Login Admin</h1>
+        <h1 className="text-xl font-bold text-black mb-6">Masuk ke PELITA</h1>
 
         <form onSubmit={handleLogin} className="space-y-4">
           {sessionExpired && (
@@ -69,6 +80,34 @@ export default function LoginPage() {
               {errorMessage}
             </p>
           )}
+
+          <div className="text-left">
+            <label htmlFor="role" className="mb-1.5 block text-xs font-medium text-gray-700">
+              Masuk sebagai
+            </label>
+            <select
+              id="role"
+              name="role"
+              required
+              value={role}
+              onChange={(e) => {
+                const selectedRole = e.target.value;
+                if (selectedRole === 'KADER' || selectedRole === 'ADMIN') {
+                  setRole(selectedRole);
+                  setErrorMessage('');
+                }
+              }}
+              className="w-full rounded-xl border border-purple-100 bg-purple-50/50 px-4 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-purple-400"
+            >
+              <option value="KADER">Kader</option>
+              <option value="ADMIN">Super Admin</option>
+            </select>
+            <p className="mt-1.5 text-xs leading-relaxed text-gray-500">
+              {role === 'ADMIN'
+                ? 'Masuk menggunakan akun yang memiliki akses Super Admin. Satu akun dapat memiliki akses Kader sekaligus Super Admin.'
+                : 'Masuk menggunakan akun yang memiliki akses Kader.'}
+            </p>
+          </div>
 
           <div>
             <input

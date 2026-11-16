@@ -14,7 +14,7 @@ export async function GET(request: Request) {
     const kategori = params.get('kategori') ? kategoriSchema.parse(params.get('kategori')) as KategoriPeserta : undefined;
     const where: Prisma.PemeriksaanWhereInput = {
       ...(kategori ? { peserta: { kategori } } : {}),
-      ...(query ? { peserta: { ...(kategori ? { kategori } : {}), OR: [{ nama: { contains: query, mode: 'insensitive' } }, { nik: { contains: query } }] } } : {}),
+      ...(query ? { peserta: { ...(kategori ? { kategori } : {}), OR: [{ nama: { contains: query } }, { nik: { contains: query } }] } } : {}),
     };
     const [items, total] = await prisma.$transaction([
       prisma.pemeriksaan.findMany({ where, orderBy: { tanggalPemeriksaan: 'desc' }, skip: (pagination.page - 1) * pagination.limit, take: pagination.limit, include: { peserta: true, jadwal: true } }),
@@ -23,4 +23,3 @@ export async function GET(request: Request) {
     return success(items, 'Examination history loaded', 200, paginationMeta(pagination.page, pagination.limit, total));
   } catch (error) { return handleApiError(error); }
 }
-

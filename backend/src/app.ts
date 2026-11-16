@@ -1,5 +1,8 @@
 import express from 'express';
 import cookieParser from 'cookie-parser';
+import helmet from 'helmet';
+import { rateLimit } from 'express-rate-limit';
+import { prisma } from './config/db.js';
 import { authenticate } from './middleware/auth.js';
 import authRouter from './routes/auth.routes.js';
 import pesertaRouter from './routes/peserta.routes.js';
@@ -7,13 +10,19 @@ import jadwalRouter from './routes/jadwal.routes.js';
 import antreanRouter from './routes/antrean.routes.js';
 import examinationRouter from './routes/pemeriksaan.routes.js';
 import analyticsRouter from './routes/rekapitulasi.routes.js';
+import dashboardRouter from './routes/dashboard.routes.js';
+import adminRouter from './routes/admin.routes.js';
 import { errorHandler, failure, success } from './utils/response.js';
 
 export const app = express();
 const allowedOrigins = (process.env.FRONTEND_ORIGIN ?? 'http://localhost:3000').split(',').map((origin) => origin.trim());
 app.disable('x-powered-by');
+app.use(helmet());
 app.use((req, res, next) => {
   const origin = req.get('origin');
+  if (origin && !allowedOrigins.includes(origin)) {
+    return failure(res, 'Origin is not allowed', 403);
+  }
   if (origin && allowedOrigins.includes(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -26,6 +35,13 @@ app.use((req, res, next) => {
 });
 app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser());
+app.use('/api/auth/login', rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  message: { success: false, message: 'Terlalu banyak percobaan login. Coba lagi dalam 15 menit.' },
+}));
 app.get('/api', (req, res) => {
   const acceptsHtml = req.get('accept')?.split(',').some((contentType) =>
     contentType.split(';', 1)[0]?.trim() === 'text/html',
@@ -68,17 +84,28 @@ app.get('/api', (req, res) => {
     endpoints: ['/api/auth', '/api/peserta', '/api/jadwal', '/api/antrean', '/api/pemeriksaan', '/api/rekapitulasi'],
   }, 'PELITA API is running');
 });
-app.get('/api/health', (_req, res) => {
-  const databaseConfigured = Boolean(process.env.DATABASE_URL);
-  if (!databaseConfigured) {
+app.get('/api/health/live', (_req, res) => success(res, { status: 'ok' }, 'API process is alive'));
+app.get('/api/health', async (_req, res) => {
+  if (!process.env.DATABASE_URL) {
     return failure(res, 'API aktif, tetapi database belum dikonfigurasi', 503, {
       status: 'needs_configuration',
       databaseConfigured: false,
     });
   }
-  return success(res, { status: 'ok', databaseConfigured: true }, 'API is healthy');
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    return success(res, { status: 'ok', database: 'connected' }, 'API and database are healthy');
+  } catch {
+    console.error('Database health check failed');
+    return failure(res, 'API aktif, tetapi database tidak dapat dihubungi', 503, {
+      status: 'database_unavailable',
+      database: 'disconnected',
+    });
+  }
 });
 app.use('/api/auth', authRouter);
+app.use('/api/admin', authenticate, adminRouter);
+app.use('/api/dashboard', authenticate, dashboardRouter);
 app.use('/api/peserta', authenticate, pesertaRouter);
 app.use('/api/jadwal', authenticate, jadwalRouter);
 app.use('/api/antrean', authenticate, antreanRouter);

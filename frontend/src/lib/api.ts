@@ -36,6 +36,17 @@ export type Schedule = {
   _count?: { antrean: number; pemeriksaan: number };
 };
 
+export type DashboardData = {
+  statistik: {
+    totalPeserta: number;
+    antreanHariIni: number;
+    sudahDiperiksaHariIni: number;
+    belumDiperiksaHariIni: number;
+  };
+  jadwalHariIni: Schedule[];
+  jadwalMendatang: Schedule[];
+};
+
 export type QueueRecord = {
   id: string;
   noAntrean: number;
@@ -71,14 +82,20 @@ export class ApiError extends Error {
   }
 }
 
-const apiBaseUrl =
-  process.env.NEXT_PUBLIC_API_URL?.replace(/\/+$/, '') ??
-  'http://localhost:4000/api';
+const configuredApiUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
+if (process.env.NODE_ENV === 'production' && !configuredApiUrl) {
+  throw new Error('NEXT_PUBLIC_API_URL harus diatur sebelum build produksi.');
+}
+const apiBaseUrl = configuredApiUrl?.replace(/\/+$/, '') ??
+  (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:4000/api');
 
 export async function apiRequest<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<ApiResponse<T>> {
+  if (!apiBaseUrl) {
+    throw new Error('NEXT_PUBLIC_API_URL harus diatur ke URL backend sebelum build produksi.');
+  }
   let response: Response;
   const headers = new Headers(options.headers);
   if (options.body && !headers.has('Content-Type')) {

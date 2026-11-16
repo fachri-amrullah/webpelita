@@ -8,10 +8,15 @@ import { loginSchema } from '../../../../lib/server/validation';
 export async function POST(request: NextRequest) {
   try {
     const input = loginSchema.parse(await readJson(request));
-    const user = await prisma.user.findUnique({ where: { email: input.email.toLowerCase() } });
-    if (!user || !(await bcrypt.compare(input.password, user.passwordHash))) return failure('Email or password is incorrect', 401);
-    const token = await createSessionToken({ id: user.id, email: user.email, name: user.name, role: user.role });
-    const response = success({ user: { id: user.id, name: user.name, email: user.email, role: user.role } }, 'Login successful');
+    const user = await prisma.user.findUnique({
+      where: { email: input.email.toLowerCase() },
+      include: { roles: { select: { role: true } } },
+    });
+    if (!user || !(await bcrypt.compare(input.password, user.passwordHash)) || !user.roles.some(({ role }) => role === input.role)) {
+      return failure('Email, password, or selected role is incorrect', 401);
+    }
+    const token = await createSessionToken({ id: user.id, email: user.email, name: user.name, role: input.role });
+    const response = success({ user: { id: user.id, name: user.name, email: user.email, role: input.role } }, 'Login successful');
     response.cookies.set(sessionCookieName, token, sessionCookieOptions);
     return response;
   } catch (error) {

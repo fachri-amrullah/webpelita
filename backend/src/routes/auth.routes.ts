@@ -9,11 +9,16 @@ const router = Router();
 router.post('/login', async (req, res, next) => {
   try {
     const input = parseBody(loginSchema, req);
-    const user = await prisma.user.findUnique({ where: { email: input.email.toLowerCase() } });
-    if (!user || !(await bcrypt.compare(input.password, user.passwordHash))) return failure(res, 'Email or password is incorrect', 401);
-    const token = await createToken({ id: user.id, email: user.email, name: user.name, role: user.role });
+    const user = await prisma.user.findUnique({
+      where: { email: input.email.toLowerCase() },
+      include: { roles: { select: { role: true } } },
+    });
+    if (!user || !(await bcrypt.compare(input.password, user.passwordHash)) || !user.roles.some(({ role }) => role === input.role)) {
+      return failure(res, 'Email, password, or selected role is incorrect', 401);
+    }
+    const token = await createToken({ id: user.id, email: user.email, name: user.name, role: input.role });
     res.cookie(sessionCookieName, token, sessionCookieOptions);
-    return success(res, { user: { id: user.id, name: user.name, email: user.email, role: user.role } }, 'Login successful');
+    return success(res, { user: { id: user.id, name: user.name, email: user.email, role: input.role } }, 'Login successful');
   } catch (error) { return next(error); }
 });
 router.get('/me', authenticate, (req, res) => success(res, req.user, 'Current user loaded'));
